@@ -44,6 +44,7 @@ class FuelLogControllerTest {
 
     private MockMvc anonymous;
 
+    /** Empties the tables and signs up "alice"; requests through {@link #mvc} are made as her. */
     @BeforeEach
     void setUp() throws Exception {
         TestUsers.deleteAll(repository, sessions, users);
@@ -51,11 +52,13 @@ class FuelLogControllerTest {
         mvc = signedInAs("alice");
     }
 
+    /** Signs up a user and returns a MockMvc whose requests all carry that user's session cookie. */
     private MockMvc signedInAs(String username) throws Exception {
         Cookie session = TestUsers.signUp(anonymous, username);
         return MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").cookie(session)).build();
     }
 
+    /** POSTs a log as alice and returns the new log's id, read from the {@code Location} header. */
     private long create(String json) throws Exception {
         String location = mvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(json))
                 .andExpect(status().isCreated())
@@ -63,6 +66,7 @@ class FuelLogControllerTest {
         return Long.parseLong(location.substring(location.lastIndexOf('/') + 1));
     }
 
+    /** POST answers 201 with a Location header and the log including miles driven, MPG and cost. */
     @Test
     void createReturnsCreatedLogWithCalculations() throws Exception {
         mvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("""
@@ -77,6 +81,7 @@ class FuelLogControllerTest {
                 .andExpect(jsonPath("$.totalCost").value(35.0));
     }
 
+    /** GET lists the logs newest (highest odometer) first, each starting where the previous ended. */
     @Test
     void listReturnsHighestOdometerFirst() throws Exception {
         create("""
@@ -94,6 +99,7 @@ class FuelLogControllerTest {
                 .andExpect(jsonPath("$[1].odometer").value(12300.0));
     }
 
+    /** A broken rule answers 400 problem+json with a readable detail. */
     @Test
     void ruleViolationReturnsProblemDetail() throws Exception {
         mvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("""
@@ -104,6 +110,7 @@ class FuelLogControllerTest {
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("greater than")));
     }
 
+    /** A body missing a required field (the odometer) answers 400. */
     @Test
     void missingFieldIsRejected() throws Exception {
         mvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("""
@@ -112,6 +119,7 @@ class FuelLogControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /** PUT edits a log, and the next log now starts at the edited odometer. */
     @Test
     void updateEditsLogAndMovesNextLog() throws Exception {
         long first = create("""
@@ -133,6 +141,7 @@ class FuelLogControllerTest {
                 .andExpect(jsonPath("$[0].milesDriven").value(200.0));
     }
 
+    /** PUT can't move a log's odometer up to or past the next log's. */
     @Test
     void updatePastNextLogIsRejected() throws Exception {
         long first = create("""
@@ -149,6 +158,7 @@ class FuelLogControllerTest {
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("next log")));
     }
 
+    /** PUT on a log that doesn't exist answers 404. */
     @Test
     void updateUnknownLogIsNotFound() throws Exception {
         mvc.perform(put(BASE + "/999999").contentType(MediaType.APPLICATION_JSON).content("""
@@ -157,6 +167,7 @@ class FuelLogControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    /** DELETE answers 204 and the log is gone from the list. */
     @Test
     void deleteRemovesLog() throws Exception {
         long id = create("""
@@ -167,11 +178,13 @@ class FuelLogControllerTest {
         mvc.perform(get(BASE)).andExpect(jsonPath("$.length()").value(0));
     }
 
+    /** DELETE on a log that doesn't exist answers 404. */
     @Test
     void deleteUnknownLogIsNotFound() throws Exception {
         mvc.perform(delete(BASE + "/999999")).andExpect(status().isNotFound());
     }
 
+    /** Without a session (no cookie, or a made-up one) the fuel-log endpoints answer 401. */
     @Test
     void signedOutRequestsAreRejected() throws Exception {
         anonymous.perform(get(BASE))
@@ -185,6 +198,7 @@ class FuelLogControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** Another user can't see, edit or delete alice's logs, and has their own odometer history. */
     @Test
     void usersOnlySeeAndChangeTheirOwnLogs() throws Exception {
         long alicesLog = create("""

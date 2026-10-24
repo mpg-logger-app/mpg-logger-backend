@@ -31,6 +31,7 @@ public class UserSession {
     @Column(nullable = false, unique = true, length = 64)
     private String tokenHash;
 
+    /** When the user signed in on this browser; kept in the database for reference. */
     @Column(nullable = false)
     private Instant createdAt;
 
@@ -41,6 +42,14 @@ public class UserSession {
     protected UserSession() {
     }
 
+    /**
+     * A new session.
+     *
+     * @param user      who signed in
+     * @param tokenHash the SHA-256 of the cookie token (see AccountService.hash)
+     * @param createdAt when they signed in
+     * @param expiresAt when the session ends unless renewed
+     */
     public UserSession(AppUser user, String tokenHash, Instant createdAt, Instant expiresAt) {
         this.user = user;
         this.tokenHash = tokenHash;
@@ -48,26 +57,22 @@ public class UserSession {
         this.expiresAt = expiresAt;
     }
 
-    public Long getId() {
-        return id;
-    }
-
+    /** @return who this session belongs to */
     public AppUser getUser() {
         return user;
     }
 
+    /** @return the SHA-256 of the cookie token */
     public String getTokenHash() {
         return tokenHash;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
+    /** @return when the session ends unless renewed */
     public Instant getExpiresAt() {
         return expiresAt;
     }
 
+    /** @param expiresAt the new end of the session (see AccountService.renewSession) */
     public void setExpiresAt(Instant expiresAt) {
         this.expiresAt = expiresAt;
     }

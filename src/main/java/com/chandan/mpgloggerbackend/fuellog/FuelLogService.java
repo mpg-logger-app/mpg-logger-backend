@@ -16,10 +16,17 @@ public class FuelLogService {
 
     private final FuelLogRepository repository;
 
+    /** @param repository where the logs are stored */
     public FuelLogService(FuelLogRepository repository) {
         this.repository = repository;
     }
 
+    /**
+     * Swift: the @Query list of fuel logs.
+     *
+     * @param user whose logs
+     * @return the user's logs, highest odometer first
+     */
     @Transactional(readOnly = true)
     public List<FuelLogResponse> findAll(AppUser user) {
         return repository.findAllByUserIdOrderByOdometerDesc(user.getId()).stream()
@@ -27,7 +34,15 @@ public class FuelLogService {
                 .toList();
     }
 
-    /** Swift: logFuelEntry() */
+    /**
+     * Swift: logFuelEntry(). The new log starts where the user's latest log ended; only the
+     * very first log uses the previous odometer from the request.
+     *
+     * @param user    who the log is for
+     * @param request the fill-up
+     * @return the saved log
+     * @throws InvalidFuelLogException if a rule is broken
+     */
     @Transactional
     public FuelLogResponse create(AppUser user, FuelLogRequest request) {
         Double latestOdometer = repository.findTopByUserIdOrderByOdometerDesc(user.getId())
@@ -52,6 +67,13 @@ public class FuelLogService {
     /**
      * Edits a log. If its odometer changes, the next log's previous odometer moves with it,
      * so that log's miles driven and MPG change too.
+     *
+     * @param user    who must own the log
+     * @param id      the log to edit
+     * @param request the new values; previousOdometer is only used for the oldest log
+     * @return the edited log
+     * @throws ResponseStatusException 404 if the log doesn't exist or isn't this user's
+     * @throws InvalidFuelLogException if a rule is broken, including passing the next log's odometer
      */
     @Transactional
     public FuelLogResponse update(AppUser user, Long id, FuelLogRequest request) {
@@ -81,7 +103,13 @@ public class FuelLogService {
         return FuelLogResponse.from(log);
     }
 
-    /** Swift: deleteLogs(at:) */
+    /**
+     * Swift: deleteLogs(at:)
+     *
+     * @param user who must own the log
+     * @param id   the log to delete
+     * @throws ResponseStatusException 404 if the log doesn't exist or isn't this user's
+     */
     @Transactional
     public void delete(AppUser user, Long id) {
         FuelLog log = repository.findByIdAndUserId(id, user.getId())
@@ -89,6 +117,12 @@ public class FuelLogService {
         repository.delete(log);
     }
 
+    /**
+     * The error for a log that doesn't exist, or belongs to someone else (which isn't revealed).
+     *
+     * @param id the log that was asked for
+     * @return a 404 exception
+     */
     private static ResponseStatusException notFound(Long id) {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Fuel log " + id + " not found.");
     }

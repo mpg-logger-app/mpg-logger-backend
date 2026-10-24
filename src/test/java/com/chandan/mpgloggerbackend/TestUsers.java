@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 /** Shared test helpers for users and sign-in. */
 public final class TestUsers {
 
+    /** Only static helpers; never instantiated. */
     private TestUsers() {
     }
 
