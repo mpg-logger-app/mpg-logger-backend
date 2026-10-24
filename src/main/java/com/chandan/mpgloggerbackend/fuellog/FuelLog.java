@@ -48,6 +48,20 @@ public class FuelLog {
         this.pricePerGallon = pricePerGallon;
     }
 
+    /** Applies an edit. previousOdometer only changes for the oldest log (see FuelLogService.update). */
+    public void update(LocalDate date, double previousOdometer, double odometer, double gallons, double pricePerGallon) {
+        this.date = date;
+        this.previousOdometer = previousOdometer;
+        this.odometer = odometer;
+        this.gallons = gallons;
+        this.pricePerGallon = pricePerGallon;
+    }
+
+    /** Keeps the next log starting where an edited log now ends. */
+    public void setPreviousOdometer(double previousOdometer) {
+        this.previousOdometer = previousOdometer;
+    }
+
     public Long getId() {
         return id;
     }

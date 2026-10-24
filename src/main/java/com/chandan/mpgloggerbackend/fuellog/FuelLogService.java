@@ -43,6 +43,36 @@ public class FuelLogService {
         return FuelLogResponse.from(saved);
     }
 
+    /**
+     * Edits a log. If its odometer changes, the next log's previous odometer moves with it,
+     * so that log's miles driven and MPG change too.
+     */
+    @Transactional
+    public FuelLogResponse update(Long id, FuelLogRequest request) {
+        FuelLog log = repository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Fuel log " + id + " not found."));
+
+        double oldOdometer = log.getOdometer();
+        boolean isOldest = repository.findTopByOdometerLessThanOrderByOdometerDesc(oldOdometer).isEmpty();
+        FuelLog next = repository.findTopByOdometerGreaterThanOrderByOdometerAsc(oldOdometer).orElse(null);
+
+        // Only the oldest log's previous odometer was typed in; the rest come from the log before them.
+        double previous = isOldest && request.previousOdometer() != null
+                ? request.previousOdometer()
+                : log.getPreviousOdometer();
+
+        FuelLogRules.validate(previous, request.odometer(), request.gallons(), request.pricePerGallon());
+        FuelLogRules.validateBeforeNext(request.odometer(), next == null ? null : next.getOdometer());
+
+        log.update(request.date(), previous, request.odometer(), request.gallons(), request.pricePerGallon());
+
+        if (next != null && request.odometer() != oldOdometer) {
+            next.setPreviousOdometer(request.odometer());
+        }
+
+        return FuelLogResponse.from(log);
+    }
+
     /** Swift: deleteLogs(at:) */
     @Transactional
     public void delete(Long id) {

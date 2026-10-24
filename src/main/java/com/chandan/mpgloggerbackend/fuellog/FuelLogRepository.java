@@ -11,4 +11,10 @@ public interface FuelLogRepository extends JpaRepository<FuelLog, Long> {
 
     /** Swift: fuelLogs.first (the log with the highest odometer). */
     Optional<FuelLog> findTopByOrderByOdometerDesc();
+
+    /** The log just before the one with this odometer reading (empty for the oldest log). */
+    Optional<FuelLog> findTopByOdometerLessThanOrderByOdometerDesc(double odometer);
+
+    /** The log just after the one with this odometer reading (empty for the latest log). */
+    Optional<FuelLog> findTopByOdometerGreaterThanOrderByOdometerAsc(double odometer);
 }

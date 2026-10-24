@@ -49,6 +49,19 @@ public final class FuelLogRules {
         return odometer - previousOdometer;
     }
 
+    /**
+     * An edited log must still end before the next log does, because the next log
+     * will start at the edited odometer.
+     *
+     * @param nextOdometer odometer of the next (newer) log, or null if the edited log is the latest
+     */
+    public static void validateBeforeNext(double odometer, Double nextOdometer) {
+        if (nextOdometer != null && !(odometer < nextOdometer)) {
+            throw new InvalidFuelLogException(
+                    "Current odometer must be less than the next log's odometer (" + nextOdometer + ").");
+        }
+    }
+
     /** Swift: FuelLog.mpg (returns 0 when gallons is 0, same as the Swift guard). */
     public static double mpg(double previousOdometer, double odometer, double gallons) {
         if (!(gallons > 0)) {
