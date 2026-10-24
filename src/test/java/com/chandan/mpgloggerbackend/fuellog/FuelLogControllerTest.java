@@ -8,6 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.chandan.mpgloggerbackend.TestUsers;
+import com.chandan.mpgloggerbackend.user.AppUserRepository;
+import com.chandan.mpgloggerbackend.user.UserSessionRepository;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,12 +33,27 @@ class FuelLogControllerTest {
     @Autowired
     private FuelLogRepository repository;
 
+    @Autowired
+    private UserSessionRepository sessions;
+
+    @Autowired
+    private AppUserRepository users;
+
+    /** Signed in as "alice": every request sends her session cookie. */
     private MockMvc mvc;
 
+    private MockMvc anonymous;
+
     @BeforeEach
-    void setUp() {
-        repository.deleteAll();
-        mvc = MockMvcBuilders.webAppContextSetup(context).build();
+    void setUp() throws Exception {
+        TestUsers.deleteAll(repository, sessions, users);
+        anonymous = MockMvcBuilders.webAppContextSetup(context).build();
+        mvc = signedInAs("alice");
+    }
+
+    private MockMvc signedInAs(String username) throws Exception {
+        Cookie session = TestUsers.signUp(anonymous, username);
+        return MockMvcBuilders.webAppContextSetup(context).defaultRequest(get("/").cookie(session)).build();
     }
 
     private long create(String json) throws Exception {
@@ -151,5 +170,47 @@ class FuelLogControllerTest {
     @Test
     void deleteUnknownLogIsNotFound() throws Exception {
         mvc.perform(delete(BASE + "/999999")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void signedOutRequestsAreRejected() throws Exception {
+        anonymous.perform(get(BASE))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Please sign in."));
+        anonymous.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"date":"2026-10-01","previousOdometer":12000,"odometer":12300,"gallons":10,"pricePerGallon":3}
+                        """))
+                .andExpect(status().isUnauthorized());
+        anonymous.perform(get(BASE).cookie(new Cookie("mpg_session", "made-up")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void usersOnlySeeAndChangeTheirOwnLogs() throws Exception {
+        long alicesLog = create("""
+                {"date":"2026-10-01","previousOdometer":12000,"odometer":12300,"gallons":10,"pricePerGallon":3}
+                """);
+        MockMvc bob = signedInAs("bob");
+
+        bob.perform(get(BASE)).andExpect(jsonPath("$.length()").value(0));
+        bob.perform(put(BASE + "/" + alicesLog).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"date":"2026-10-01","odometer":12400,"gallons":10,"pricePerGallon":3}
+                        """))
+                .andExpect(status().isNotFound());
+        bob.perform(delete(BASE + "/" + alicesLog)).andExpect(status().isNotFound());
+
+        // Bob's first log needs his own previous odometer: Alice's 12,300 doesn't count.
+        bob.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"date":"2026-10-02","odometer":500,"gallons":10,"pricePerGallon":3}
+                        """))
+                .andExpect(status().isBadRequest());
+        bob.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"date":"2026-10-02","previousOdometer":100,"odometer":500,"gallons":10,"pricePerGallon":3}
+                        """))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get(BASE))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].odometer").value(12300.0));
     }
 }
