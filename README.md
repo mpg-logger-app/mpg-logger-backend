@@ -42,6 +42,7 @@ or the Neon console's **SQL Editor** instead. On startup Hibernate checks that t
 ```
 
 The API listens on http://localhost:8080. Run the tests with `.\mvnw.cmd test`.
+`.\mvnw.cmd verify` also writes a JaCoCo coverage report to `target/site/jacoco/index.html`.
 
 ## API
 
@@ -49,6 +50,7 @@ The API listens on http://localhost:8080. Run the tests with `.\mvnw.cmd test`.
 |---|---|---|
 | GET | `/api/fuel-logs` | All logs, highest odometer first |
 | POST | `/api/fuel-logs` | Add a log |
+| PUT | `/api/fuel-logs/{id}` | Edit a log |
 | DELETE | `/api/fuel-logs/{id}` | Delete a log |
 
 POST body:
@@ -68,5 +70,10 @@ odometer of the log with the highest reading, the same as the iPad app did.
 
 Rules (from the Swift app): previous odometer > 0, odometer > previous odometer,
 gallons > 0, price > 0. Breaking one returns `400` with a `detail` message.
+
+PUT takes the same body. `previousOdometer` is only used when editing the oldest log; every
+other log keeps starting where the log before it ended. If the odometer changes, the next log's
+previous odometer is moved to the new reading, so its miles driven and MPG update too. The new
+odometer must stay below the next log's odometer, or the edit is rejected with `400`.
 
 Each log in a response also includes the calculated `milesDriven`, `mpg` and `totalCost`.

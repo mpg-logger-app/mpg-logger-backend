@@ -41,6 +41,14 @@ class FuelLogRulesTest {
     }
 
     @Test
+    void editedOdometerMustStayBelowNextLog() {
+        FuelLogRules.validateBeforeNext(12400, 12500.0);
+        FuelLogRules.validateBeforeNext(99999, null);
+        assertThrows(InvalidFuelLogException.class, () -> FuelLogRules.validateBeforeNext(12500, 12500.0));
+        assertThrows(InvalidFuelLogException.class, () -> FuelLogRules.validateBeforeNext(12600, 12500.0));
+    }
+
+    @Test
     void calculationsMatchSwiftApp() {
         assertEquals(300, FuelLogRules.milesDriven(12000, 12300));
         assertEquals(30, FuelLogRules.mpg(12000, 12300, 10), 1e-9);
