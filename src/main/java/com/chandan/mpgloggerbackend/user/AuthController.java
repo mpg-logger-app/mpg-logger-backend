@@ -19,11 +19,19 @@ public class AuthController {
 
     private final AccountService accounts;
 
+    /** @param accounts does the work; this class only maps HTTP to it */
     public AuthController(AccountService accounts) {
         this.accounts = accounts;
     }
 
-    /** Creates the account and signs straight in. 409 if the username is taken. */
+    /**
+     * {@code POST /api/auth/signup}: creates the account and signs straight in.
+     *
+     * @param body     the username, name and password
+     * @param request  the incoming request (decides whether the cookie is Secure)
+     * @param response where the session cookie is set
+     * @return {@code 201 Created} with the new account; 400 if a rule is broken, 409 if the username is taken
+     */
     @PostMapping("/signup")
     public ResponseEntity<AccountResponse> signUp(@RequestBody SignUp body,
             HttpServletRequest request, HttpServletResponse response) {
@@ -32,7 +40,15 @@ public class AuthController {
         return ResponseEntity.created(URI.create("/api/account")).body(AccountResponse.from(user));
     }
 
-    /** 401 with the same message whether the username or the password is wrong. */
+    /**
+     * {@code POST /api/auth/signin}: signs in. 401 with the same message whether the username or the
+     * password is wrong.
+     *
+     * @param body     the username and password
+     * @param request  the incoming request (decides whether the cookie is Secure)
+     * @param response where the session cookie is set
+     * @return the account
+     */
     @PostMapping("/signin")
     public AccountResponse signIn(@RequestBody SignIn body,
             HttpServletRequest request, HttpServletResponse response) {
@@ -41,7 +57,13 @@ public class AuthController {
         return AccountResponse.from(user);
     }
 
-    /** Ends this browser's session. Always succeeds, even if it had already ended. */
+    /**
+     * {@code POST /api/auth/signout}: ends this browser's session. Always succeeds, even if it had already ended.
+     *
+     * @param request  carries the session cookie, if any
+     * @param response where the cookie is cleared
+     * @return {@code 204 No Content}
+     */
     @PostMapping("/signout")
     public ResponseEntity<Void> signOut(HttpServletRequest request, HttpServletResponse response) {
         SessionCookie.read(request).ifPresent(accounts::endSession);

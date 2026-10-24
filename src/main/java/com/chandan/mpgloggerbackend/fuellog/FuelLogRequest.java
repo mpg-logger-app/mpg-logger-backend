@@ -10,6 +10,12 @@ import java.time.LocalDate;
  * uses the highest existing odometer reading, just like the Swift app.
  * PUT: previousOdometer is only read when editing the oldest log; every other log
  * keeps starting where the log before it ended.
+ *
+ * @param date             the day of the fill-up
+ * @param previousOdometer where the tank started; optional (see above)
+ * @param odometer         the odometer reading at this fill-up
+ * @param gallons          gallons pumped
+ * @param pricePerGallon   price paid per gallon, in dollars
  */
 public record FuelLogRequest(
         @NotNull LocalDate date,

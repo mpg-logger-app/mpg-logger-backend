@@ -46,24 +46,28 @@ class AuthControllerTest {
 
     private MockMvc mvc;
 
+    /** Starts every test with empty tables and a signed-out MockMvc. */
     @BeforeEach
     void setUp() {
         TestUsers.deleteAll(logs, sessions, users);
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
     }
 
+    /** POSTs a sign-up. */
     private ResultActions signUp(String username, String name, String password) throws Exception {
         return mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
                 {"username":"%s","name":"%s","password":"%s"}
                 """.formatted(username, name, password)));
     }
 
+    /** POSTs a sign-in. */
     private ResultActions signIn(String username, String password) throws Exception {
         return mvc.perform(post("/api/auth/signin").contentType(MediaType.APPLICATION_JSON).content("""
                 {"username":"%s","password":"%s"}
                 """.formatted(username, password)));
     }
 
+    /** Sign-up creates a lowercase account and sets a lasting, HttpOnly, SameSite=Lax session cookie that works. */
     @Test
     void signUpCreatesAccountAndSignsIn() throws Exception {
         MockHttpServletResponse response = signUp("  Chandan ", " Chandan J ", "password123")
@@ -86,6 +90,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.username").value("chandan"));
     }
 
+    /** The stored password is a BCrypt hash, never the password itself. */
     @Test
     void passwordIsStoredAsBcryptHash() throws Exception {
         signUp("chandan", "Chandan", "password123").andExpect(status().isCreated());
@@ -95,6 +100,7 @@ class AuthControllerTest {
         assertTrue(stored.getPasswordHash().startsWith("$2"), stored.getPasswordHash());
     }
 
+    /** Only the SHA-256 of the session token is stored, not the token from the cookie. */
     @Test
     void sessionTokenIsStoredOnlyAsHash() throws Exception {
         Cookie cookie = TestUsers.signUp(mvc, "chandan");
@@ -104,6 +110,7 @@ class AuthControllerTest {
         assertEquals(AccountService.hash(cookie.getValue()), session.getTokenHash());
     }
 
+    /** A username that differs only in case is taken: 409, and no second account. */
     @Test
     void usernamesAreUniqueIgnoringCase() throws Exception {
         signUp("chandan", "Chandan", "password123").andExpect(status().isCreated());
@@ -113,6 +120,7 @@ class AuthControllerTest {
         assertEquals(1, users.count());
     }
 
+    /** Breaking a sign-up rule answers 400 with the rule's message, and no account is created. */
     @Test
     void signUpRulesAreChecked() throws Exception {
         signUp("ab", "Name", "password123")
@@ -127,6 +135,7 @@ class AuthControllerTest {
         assertEquals(0, users.count());
     }
 
+    /** Sign-in (username in any case) returns the account and a working session cookie. */
     @Test
     void signInWithRightPasswordStartsSession() throws Exception {
         signUp("chandan", "Chandan", "password123");
@@ -139,6 +148,7 @@ class AuthControllerTest {
         mvc.perform(get("/api/account").cookie(cookie)).andExpect(status().isOk());
     }
 
+    /** A wrong password, an unknown username and an empty body all get the same 401, and no cookie. */
     @Test
     void wrongUsernameOrPasswordGetTheSameAnswer() throws Exception {
         signUp("chandan", "Chandan", "password123");
@@ -154,6 +164,7 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** Sign-out deletes the session and clears the cookie; the old cookie no longer works. */
     @Test
     void signOutEndsTheSession() throws Exception {
         Cookie cookie = TestUsers.signUp(mvc, "chandan");
@@ -167,11 +178,13 @@ class AuthControllerTest {
         assertEquals(0, sessions.count());
     }
 
+    /** Signing out without a session still answers 204. */
     @Test
     void signOutWithoutSessionStillSucceeds() throws Exception {
         mvc.perform(post("/api/auth/signout")).andExpect(status().isNoContent());
     }
 
+    /** An expired session answers 401. */
     @Test
     void expiredSessionIsRejected() throws Exception {
         Cookie cookie = TestUsers.signUp(mvc, "chandan");
@@ -182,6 +195,7 @@ class AuthControllerTest {
         mvc.perform(get("/api/account").cookie(cookie)).andExpect(status().isUnauthorized());
     }
 
+    /** A fresh session isn't renewed; one last renewed days ago is pushed forward and the cookie sent again. */
     @Test
     void usingTheAppPushesTheExpiryForward() throws Exception {
         Cookie cookie = TestUsers.signUp(mvc, "chandan");
@@ -202,6 +216,7 @@ class AuthControllerTest {
         assertTrue(sessions.findAll().getFirst().getExpiresAt().isAfter(oldExpiry.plus(9, ChronoUnit.DAYS)));
     }
 
+    /** The account endpoints answer 401 without a session. */
     @Test
     void accountNeedsSignIn() throws Exception {
         mvc.perform(get("/api/account")).andExpect(status().isUnauthorized());
@@ -209,6 +224,7 @@ class AuthControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    /** PUT /api/account changes only the (trimmed) name, never the username, and checks the name rules. */
     @Test
     void updateChangesOnlyTheName() throws Exception {
         Cookie cookie = TestUsers.signUp(mvc, "chandan");
