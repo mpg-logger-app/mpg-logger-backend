@@ -1,5 +1,6 @@
 package com.chandan.mpgloggerbackend.fuellog;
 
+import com.chandan.mpgloggerbackend.user.AppUser;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/** The signed-in user's fuel logs. {@code AppUser user} is filled in from the session cookie (see user.WebConfig). */
 @RestController
 @RequestMapping("/api/fuel-logs")
 public class FuelLogController {
@@ -23,15 +25,15 @@ public class FuelLogController {
         this.service = service;
     }
 
-    /** All logs, highest odometer first. */
+    /** All of this user's logs, highest odometer first. */
     @GetMapping
-    public List<FuelLogResponse> list() {
-        return service.findAll();
+    public List<FuelLogResponse> list(AppUser user) {
+        return service.findAll(user);
     }
 
     @PostMapping
-    public ResponseEntity<FuelLogResponse> create(@Valid @RequestBody FuelLogRequest request) {
-        FuelLogResponse created = service.create(request);
+    public ResponseEntity<FuelLogResponse> create(AppUser user, @Valid @RequestBody FuelLogRequest request) {
+        FuelLogResponse created = service.create(user, request);
         return ResponseEntity
                 .created(URI.create("/api/fuel-logs/" + created.id()))
                 .body(created);
@@ -39,13 +41,13 @@ public class FuelLogController {
 
     /** Edits a log; if the odometer changes, the next log starts at the new reading. */
     @PutMapping("/{id}")
-    public FuelLogResponse update(@PathVariable Long id, @Valid @RequestBody FuelLogRequest request) {
-        return service.update(id, request);
+    public FuelLogResponse update(AppUser user, @PathVariable Long id, @Valid @RequestBody FuelLogRequest request) {
+        return service.update(user, id, request);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        service.delete(id);
+    public ResponseEntity<Void> delete(AppUser user, @PathVariable Long id) {
+        service.delete(user, id);
         return ResponseEntity.noContent().build();
     }
 }

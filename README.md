@@ -30,10 +30,44 @@ Then create the tables once (safe to re-run):
 .\scripts\db-setup.ps1
 ```
 
-This runs [`db/schema.sql`](db/schema.sql) with `psql`, which creates the `mpglogger` schema and the
-`fuel_log` table inside it. Without `psql`, run that file in DBeaver (**Alt+X**, Execute SQL Script)
-or the Neon console's **SQL Editor** instead. On startup Hibernate checks that the tables match the
-`FuelLog` entity (`ddl-auto=validate`) and fails fast if they don't.
+This runs [`db/schema.sql`](db/schema.sql) with `psql`, which creates the `mpglogger` schema and its
+tables: `app_user`, `user_session` and `fuel_log`. Without `psql`, run that file in DBeaver
+(**Alt+X**, Execute SQL Script) or the Neon console's **SQL Editor** instead. On startup Hibernate
+checks that the tables match the entities (`ddl-auto=validate`) and fails fast if they don't.
+
+### Upgrading a database from before accounts existed
+
+`schema.sql` is for a new, empty database. A database that already has fuel logs but no users is
+upgraded in two steps, so the existing logs end up on your account:
+
+1. Before deploying this version, add the new tables (safe to re-run):
+
+   ```powershell
+   .\scripts\db-setup.ps1 -SqlFile db\migrations\001-add-users.sql
+   ```
+
+   Existing logs get an empty `user_id` for now, so they're hidden until step 2.
+
+2. Deploy, sign up, then right away (before logging any fuel) give the existing logs to your account:
+
+   ```powershell
+   .\scripts\db-setup.ps1 -SqlFile db\migrations\002-claim-existing-logs.sql
+   ```
+
+   This only claims logs while exactly one account exists, then makes `user_id` required.
+
+## Accounts and sessions
+
+- Usernames are unique and case-insensitive (stored lowercase): 3–30 letters, numbers, `.` or `_`.
+- Passwords are hashed with BCrypt (`spring-security-crypto`); they are never stored or returned.
+  8 characters minimum, 72 bytes maximum (BCrypt's limit).
+- Signing in creates a row in `user_session` and sets an `mpg_session` cookie: random 256-bit token,
+  `HttpOnly`, `SameSite=Lax`, `Path=/api`, `Secure` over HTTPS, `Max-Age` 400 days (the most browsers allow).
+  Only the token's SHA-256 is stored. The expiry moves forward (at most daily) while the app is used,
+  so in practice you stay signed in, across browser restarts and server redeploys, until you sign out.
+- Every `/api` endpoint except sign-up/in/out needs a session (`AuthInterceptor`), and each user
+  only ever sees their own fuel logs. Another user's log answers `404`, the same as a missing one.
+- `server.forward-headers-strategy=framework` lets the app see HTTPS behind a hosting proxy.
 
 ## Run
 
@@ -48,7 +82,12 @@ The API listens on http://localhost:8080. Run the tests with `.\mvnw.cmd test`.
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/fuel-logs` | All logs, highest odometer first |
+| POST | `/api/auth/signup` | `{username, name, password}` → `201`, signs in. `409` if the username is taken |
+| POST | `/api/auth/signin` | `{username, password}` → `200`, signs in. `401` "Wrong username or password." |
+| POST | `/api/auth/signout` | Ends this browser's session → `204` |
+| GET | `/api/account` | The signed-in user `{id, username, name}`, or `401` |
+| PUT | `/api/account` | `{name}` → updated user (only the name can change for now) |
+| GET | `/api/fuel-logs` | All of your logs, highest odometer first |
 | POST | `/api/fuel-logs` | Add a log |
 | PUT | `/api/fuel-logs/{id}` | Edit a log |
 | DELETE | `/api/fuel-logs/{id}` | Delete a log |

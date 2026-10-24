@@ -1,10 +1,14 @@
 package com.chandan.mpgloggerbackend.fuellog;
 
+import com.chandan.mpgloggerbackend.user.AppUser;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 
@@ -19,6 +23,11 @@ public class FuelLog {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    // Whose log this is. Lazy: the API never needs the owner's details, only to filter by them.
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private AppUser user;
 
     // "date" is avoided as a column name because it is an SQL keyword.
     @Column(name = "fuel_date", nullable = false)
@@ -40,7 +49,8 @@ public class FuelLog {
     protected FuelLog() {
     }
 
-    public FuelLog(LocalDate date, double previousOdometer, double odometer, double gallons, double pricePerGallon) {
+    public FuelLog(AppUser user, LocalDate date, double previousOdometer, double odometer, double gallons, double pricePerGallon) {
+        this.user = user;
         this.date = date;
         this.previousOdometer = previousOdometer;
         this.odometer = odometer;
