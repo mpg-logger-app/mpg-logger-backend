@@ -75,8 +75,20 @@ upgraded in two steps, so the existing logs end up on your account:
 .\mvnw.cmd spring-boot:run
 ```
 
-The API listens on http://localhost:8080. Run the tests with `.\mvnw.cmd test`.
-`.\mvnw.cmd verify` also writes a JaCoCo coverage report to `target/site/jacoco/index.html`.
+The API listens on http://localhost:8080 (or on `$PORT` if that is set). Run the tests with
+`.\mvnw.cmd test`. `.\mvnw.cmd verify` also writes a JaCoCo coverage report to
+`target/site/jacoco/index.html`.
+
+## Hosting
+
+The app is hosted for free on Google Cloud Run, with the React app on Netlify in front of it.
+[`HOSTING.md`](HOSTING.md) walks through it step by step. The [`Dockerfile`](Dockerfile) builds the
+container Cloud Run runs; to try it locally (with Docker Desktop running):
+
+```powershell
+docker build -t mpg-logger-backend .
+docker run -p 8080:8080 -e DB_URL=$env:DB_URL -e DB_USERNAME=$env:DB_USERNAME -e DB_PASSWORD=$env:DB_PASSWORD mpg-logger-backend
+```
 
 ## API
 
