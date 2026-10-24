@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+/** {@link FuelLogService} against an in-memory database: how adding, editing and deleting a log affects the logs around it. */
 @SpringBootTest
 class FuelLogServiceTest {
 
@@ -37,6 +38,7 @@ class FuelLogServiceTest {
     private FuelLogResponse second;
     private FuelLogResponse third;
 
+    /** Empties the tables and gives alice three logs: 12,000 to 12,300 to 12,600 to 12,900. */
     @BeforeEach
     void setUp() {
         TestUsers.deleteAll(repository, sessions, users);
@@ -46,6 +48,7 @@ class FuelLogServiceTest {
         third = service.create(user, new FuelLogRequest(DAY.plusDays(14), null, 12900.0, 10.0, 3.0));
     }
 
+    /** Changing a log's odometer moves the next log's start with it, and only that log. */
     @Test
     void odometerChangeMovesNextLogsPreviousOdometer() {
         FuelLogResponse edited = service.update(user, first.id(), new FuelLogRequest(DAY, null, 12400.0, 10.0, 3.0));
@@ -58,6 +61,7 @@ class FuelLogServiceTest {
         assertEquals(12600, repository.findById(third.id()).orElseThrow().getPreviousOdometer());
     }
 
+    /** Editing the date, gallons or price recalculates the log but doesn't touch the next one. */
     @Test
     void editingOtherFieldsLeavesNextLogAlone() {
         FuelLogResponse edited = service.update(user, second.id(),
@@ -69,6 +73,7 @@ class FuelLogServiceTest {
         assertEquals(12600, repository.findById(third.id()).orElseThrow().getPreviousOdometer());
     }
 
+    /** An edit reaching the next log's odometer is rejected and nothing is saved. */
     @Test
     void odometerCannotReachNextLogsOdometer() {
         assertThrows(InvalidFuelLogException.class,
@@ -76,12 +81,14 @@ class FuelLogServiceTest {
         assertEquals(12300, repository.findById(first.id()).orElseThrow().getOdometer());
     }
 
+    /** An edit can't drop the odometer to or below where the log started. */
     @Test
     void odometerMustStayAbovePreviousOdometer() {
         assertThrows(InvalidFuelLogException.class,
                 () -> service.update(user, second.id(), new FuelLogRequest(DAY, null, 12300.0, 10.0, 3.0)));
     }
 
+    /** Only the oldest log takes a new previous odometer; later logs ignore it. */
     @Test
     void onlyOldestLogCanChangePreviousOdometer() {
         FuelLogResponse oldest = service.update(user, first.id(), new FuelLogRequest(DAY, 11900.0, 12300.0, 10.0, 3.0));
@@ -92,6 +99,7 @@ class FuelLogServiceTest {
         assertEquals(12300, middle.previousOdometer());
     }
 
+    /** The latest log has no next log, so its odometer can go up as far as needed. */
     @Test
     void latestLogCanMoveUpFreely() {
         FuelLogResponse edited = service.update(user, third.id(),
@@ -99,12 +107,14 @@ class FuelLogServiceTest {
         assertEquals(400, edited.milesDriven());
     }
 
+    /** A new log starts at the highest existing odometer, ignoring a typed previous odometer. */
     @Test
     void newLogStartsAtHighestOdometerIgnoringTypedPrevious() {
         FuelLogResponse created = service.create(user, new FuelLogRequest(DAY.plusDays(21), 1.0, 13200.0, 10.0, 3.0));
         assertEquals(12900, created.previousOdometer());
     }
 
+    /** With no logs, a new log without a previous odometer is rejected. */
     @Test
     void firstLogNeedsPreviousOdometer() {
         repository.deleteAll();
@@ -112,12 +122,14 @@ class FuelLogServiceTest {
                 () -> service.create(user, new FuelLogRequest(DAY, null, 12300.0, 10.0, 3.0)));
     }
 
+    /** The list comes back newest first. */
     @Test
     void findAllIsNewestFirst() {
         assertEquals(java.util.List.of(third.id(), second.id(), first.id()),
                 service.findAll(user).stream().map(FuelLogResponse::id).toList());
     }
 
+    /** Deleting one log leaves the others. */
     @Test
     void deleteRemovesOnlyThatLog() {
         service.delete(user, second.id());
@@ -125,12 +137,14 @@ class FuelLogServiceTest {
                 service.findAll(user).stream().map(FuelLogResponse::id).toList());
     }
 
+    /** Deleting a log that doesn't exist is a 404. */
     @Test
     void deletingUnknownLogIsNotFound() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> service.delete(user, -1L));
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
+    /** Editing a log that doesn't exist is a 404. */
     @Test
     void unknownLogIsNotFound() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
@@ -138,6 +152,7 @@ class FuelLogServiceTest {
         assertEquals(HttpStatus.NOT_FOUND, ex.getStatusCode());
     }
 
+    /** A second user's logs don't affect alice's previous or next log, and they can't delete hers. */
     @Test
     void eachUserHasTheirOwnOdometerHistory() {
         AppUser bob = users.save(new AppUser("bob", "Bob", "not-a-real-hash"));
