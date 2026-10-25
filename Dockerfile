@@ -1,4 +1,4 @@
-# Container image for Google Cloud Run (also runs anywhere Docker does).
+# Container image for the Spring Boot API. deploy/docker-compose.yml runs it behind Caddy (see HOSTING.md).
 # Build:  docker build -t mpg-logger-backend .
 # Run:    docker run -p 8080:8080 -e DB_URL=... -e DB_USERNAME=... -e DB_PASSWORD=... mpg-logger-backend
 
@@ -14,11 +14,13 @@ RUN sh ./mvnw -q -B -DskipTests package
 
 # ---- Run: just a JRE and the jar ----
 FROM eclipse-temurin:21-jre
+LABEL org.opencontainers.image.source="https://github.com/mpg-logger-app/mpg-logger-backend"
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
-# Use most of the container's memory for the heap, and start faster (helps Cloud Run cold starts).
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:TieredStopAtLevel=1"
-# Cloud Run sends traffic to $PORT (8080 by default); application.properties reads it.
+# Use most of the container's memory for the heap. The serial collector has the least overhead,
+# which suits a small machine running one app.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+UseSerialGC"
+# Listens on $PORT (8080 by default); application.properties reads it.
 EXPOSE 8080
 USER 1000
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
