@@ -1,4 +1,4 @@
-# Container image for the Spring Boot API. deploy/docker-compose.yml runs it behind Caddy (see HOSTING.md).
+# Container image for the Spring Boot API. Render builds and runs it (render.yaml, HOSTING.md).
 # Build:  docker build -t mpg-logger-backend .
 # Run:    docker run -p 8080:8080 -e DB_URL=... -e DB_USERNAME=... -e DB_PASSWORD=... mpg-logger-backend
 
@@ -14,7 +14,6 @@ RUN sh ./mvnw -q -B -DskipTests package
 
 # ---- Run: just a JRE and the jar ----
 FROM eclipse-temurin:21-jre
-LABEL org.opencontainers.image.source="https://github.com/mpg-logger-app/mpg-logger-backend"
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 # Use most of the container's memory for the heap. The serial collector has the least overhead,

@@ -81,11 +81,10 @@ The API listens on http://localhost:8080 (or on `$PORT` if that is set). Run the
 
 ## Hosting
 
-The app runs on one small Google Cloud VM (about $3.65 a month): Caddy serves the React app and
-forwards `/api` to this API, both in Docker, started by
-[`deploy/docker-compose.yml`](deploy/docker-compose.yml). [`HOSTING.md`](HOSTING.md) walks through it
-step by step, and [`scripts/deploy.ps1`](scripts/deploy.ps1) deploys an update. The
-[`Dockerfile`](Dockerfile) builds the API's container; to try it on its own (with Docker Desktop running):
+The app runs on Render ($7 a month): this API as an always-on web service, and the React app as a
+free static site that forwards `/api` to it. [`render.yaml`](render.yaml) describes both, and Render
+redeploys them on every push to `develop`. [`HOSTING.md`](HOSTING.md) walks through the setup step by
+step. The [`Dockerfile`](Dockerfile) builds the API's container; to try it locally (with Docker Desktop running):
 
 ```powershell
 docker build -t mpg-logger-backend .
