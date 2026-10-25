@@ -6,10 +6,6 @@ target/
 
 ### Local H2 database (your fuel log data) ###
 data/
-
-### Hosting settings, including the database password (deploy/.env.example shows the format) ###
-.env
-
 ### STS ###
 .apt_generated
 .classpath
